@@ -2,9 +2,13 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"go-api/internal/tasks"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type TaskHandler struct {
@@ -65,9 +69,19 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
+	if _, err := uuid.Parse(id); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid task id")
+		return
+	}
+
 	task, err := h.repo.GetByID(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "cannot get the task by id")
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "task not found")
+			return
+		}
+
+		writeError(w, http.StatusBadRequest, "failed to get task")
 		return
 	}
 
@@ -77,9 +91,17 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
+	if _, err := uuid.Parse(id); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid task id")
+		return
+	}
+
 	task, err := h.repo.Complete(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "could not update the task to completed")
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "task not found")
+		}
+		writeError(w, http.StatusBadRequest, "failed to complete task")
 		return
 	}
 
