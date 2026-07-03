@@ -6,6 +6,7 @@ import (
 	"go-api/internal/db"
 	"go-api/internal/events"
 	httpserver "go-api/internal/http"
+	"go-api/internal/stats"
 	"go-api/internal/tasks"
 	"net/http"
 	"os"
@@ -38,9 +39,18 @@ func main() {
 	}
 	defer natsConn.Close()
 
+	statsAddr := os.Getenv("STATS_GRPC_ADDR")
+	if statsAddr == "" {
+		statsAddr = "localhost:50051"
+	}
+	statsClient, err := stats.NewClient(statsAddr)
+	if err != nil {
+		panic(err)
+	}
+	defer statsClient.Close()
 	taskRepo := tasks.NewRepository(pool)
 	eventPublisher := events.NewPublisher(natsConn)
-	router := httpserver.NewRouter(taskRepo, eventPublisher)
+	router := httpserver.NewRouter(taskRepo, eventPublisher, statsClient)
 
 	fmt.Println("API listening on :8080")
 

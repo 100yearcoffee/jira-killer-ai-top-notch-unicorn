@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package stats.v1;
+
+option go_package = "go-api/gen/stats/v1;statsv1";
+
+service StatsService {
+    rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+}
+
+message GetStatsRequest {}
+
+message GetStatsResponse {
+    int32 total_tasks = 1;
+    int32 completed_tasks = 2;
+}

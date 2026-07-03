@@ -2,15 +2,57 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde::Deserialize;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 use tracing::info;
 use uuid::Uuid;
+
+pub mod stats {
+    tonic::include_proto!("stats.v1");
+}
 
 #[derive(Debug, Deserialize)]
 struct TaskEvent {
     event_id: Uuid,
     task_id: Uuid,
     created_at: DateTime<Utc>,
+}
+
+use stats::stats_service_server::{StatsService, StatsServiceServer};
+use stats::{GetStatsRequest, GetStatsResponse};
+
+struct StatsRpcService {
+    db: PgPool,
+}
+
+#[tonic::async_trait]
+impl StatsService for StatsRpcService {
+    async fn get_stats(
+        &self,
+        _request: Request<GetStatsRequest>,
+    ) -> std::result::Result<Response<GetStatsResponse>, Status> {
+        let row = sqlx::query_as::<_, (i32, i32)>(
+            r#"
+            SELECT total_tasks, completed_tasks
+            FROM tasks_stats
+            WHERE id = 1
+            "#,
+        )
+        .fetch_one(&self.db)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "failed to fetch task stats");
+            Status::internal("failed to fetch task stats")
+        })?;
+
+        let response = GetStatsResponse {
+            total_tasks: row.0,
+            completed_tasks: row.1,
+        };
+
+        Ok(Response::new(response))
+    }
 }
 
 #[tokio::main]
@@ -37,6 +79,22 @@ async fn main() -> Result<()> {
         .await?;
 
     info!("connected to PostgreSQL");
+
+    let grpc_addr = std::env::var("GRPC_ADDR")
+        .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
+        .parse()?;
+
+    let stats_service = StatsRpcService { db: db.clone() };
+
+    tokio::spawn(async move {
+        if let Err(error) = Server::builder()
+            .add_service(StatsServiceServer::new(stats_service))
+            .serve(grpc_addr)
+            .await
+        {
+            tracing::error!(error = %error, "gRPC server failed");
+        }
+    });
 
     let mut subscriber = client.subscribe("task.*").await?;
 

@@ -5,13 +5,15 @@ import (
 	nethttp "net/http"
 
 	"go-api/internal/events"
+	"go-api/internal/stats"
 	"go-api/internal/tasks"
 )
 
-func NewRouter(taskRepo *tasks.Repository, eventPublisher *events.Publisher) nethttp.Handler {
+func NewRouter(taskRepo *tasks.Repository, eventPublisher *events.Publisher, statsClient *stats.Client) nethttp.Handler {
 	mux := nethttp.NewServeMux()
 
 	taskHandler := NewTaskHandler(taskRepo, eventPublisher)
+	statsHandler := NewStatsHandler(statsClient)
 
 	mux.HandleFunc("GET /health", func(w nethttp.ResponseWriter, r *nethttp.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -23,6 +25,7 @@ func NewRouter(taskRepo *tasks.Repository, eventPublisher *events.Publisher) net
 	mux.HandleFunc("GET /tasks", taskHandler.List)
 	mux.HandleFunc("GET /tasks/{id}", taskHandler.GetByID)
 	mux.HandleFunc("PATCH /tasks/{id}/complete", taskHandler.Complete)
+	mux.HandleFunc("GET /stats", statsHandler.Get)
 
 	return mux
 }

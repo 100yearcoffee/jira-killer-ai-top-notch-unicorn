@@ -17,11 +17,13 @@ services:
       DATABASE_URL: postgres://tasks_user:tasks_password@postgres:5432/tasks
       PORT: "8080"
       NATS_URL: nats://nats:4222
+      STATS_GRPC_ADDR: rust-worker:50051
     ports:
       - "8080:8080"
     depends_on:
       - postgres
       - nats
+      - rust-worker
 
   nats:
     image: nats:2.10-alpine
@@ -42,10 +44,14 @@ services:
 
   rust-worker:
     build:
-      context: ./rust-worker
+      context: .
+      dockerfile: rust-worker/Dockerfile
     environment:
       NATS_URL: nats://nats:4222
       DATABASE_URL: postgres://tasks_user:tasks_password@postgres:5432/tasks
+      GRPC_ADDR: 0.0.0.0:50051
+    ports:
+      - "50051:50051"
     depends_on:
       - nats
       - postgres
