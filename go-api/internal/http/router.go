@@ -4,13 +4,14 @@ import (
 	"fmt"
 	nethttp "net/http"
 
+	"go-api/internal/events"
 	"go-api/internal/tasks"
 )
 
-func NewRouter(taskRepo *tasks.Repository) nethttp.Handler {
+func NewRouter(taskRepo *tasks.Repository, eventPublisher *events.Publisher) nethttp.Handler {
 	mux := nethttp.NewServeMux()
 
-	taskHandler := NewTaskHandler(taskRepo)
+	taskHandler := NewTaskHandler(taskRepo, eventPublisher)
 
 	mux.HandleFunc("GET /health", func(w nethttp.ResponseWriter, r *nethttp.Request) {
 		w.Header().Set("Content-Type", "application/json")

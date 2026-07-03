@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"go-api/internal/events"
 	"go-api/internal/tasks"
 	"net/http"
 	"strings"
@@ -12,11 +13,15 @@ import (
 )
 
 type TaskHandler struct {
-	repo *tasks.Repository
+	repo      *tasks.Repository
+	publisher *events.Publisher
 }
 
-func NewTaskHandler(repo *tasks.Repository) *TaskHandler {
-	return &TaskHandler{repo: repo}
+func NewTaskHandler(repo *tasks.Repository, publisher *events.Publisher) *TaskHandler {
+	return &TaskHandler{
+		repo:      repo,
+		publisher: publisher,
+	}
 }
 
 type createTaskRequest struct {
@@ -49,6 +54,12 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	task, err := h.repo.Create(r.Context(), req.Title, req.Description)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "failed to create a task")
+		return
+	}
+
+	err = h.publisher.PublishTaskEvent(events.TaskCreated, task.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to publish task created event")
 		return
 	}
 
@@ -100,8 +111,15 @@ func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "task not found")
+			return
 		}
 		writeError(w, http.StatusBadRequest, "failed to complete task")
+		return
+	}
+
+	err = h.publisher.PublishTaskEvent(events.TaskCompleted, task.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to publish task completed event")
 		return
 	}
 

@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"go-api/internal/db"
+	"go-api/internal/events"
+	httpserver "go-api/internal/http"
+	"go-api/internal/tasks"
 	"net/http"
 	"os"
 
-	"go-api/internal/db"
-	httpserver "go-api/internal/http"
-	"go-api/internal/tasks"
+	"github.com/nats-io/nats.go"
 )
 
 func main() {
@@ -25,8 +27,20 @@ func main() {
 	}
 	defer pool.Close()
 
+	natsURL := os.Getenv("NATS_URL")
+	if natsURL == "" {
+		panic("NATS_URL is required")
+	}
+
+	natsConn, err := nats.Connect(natsURL)
+	if err != nil {
+		panic(err)
+	}
+	defer natsConn.Close()
+
 	taskRepo := tasks.NewRepository(pool)
-	router := httpserver.NewRouter(taskRepo)
+	eventPublisher := events.NewPublisher(natsConn)
+	router := httpserver.NewRouter(taskRepo, eventPublisher)
 
 	fmt.Println("API listening on :8080")
 
