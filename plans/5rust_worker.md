@@ -33,7 +33,7 @@ Write to:
 
 ```text
 audit_logs
-task_stats
+tasks_stats
 ```
 
 ## Database Tables
@@ -48,7 +48,7 @@ task_id UUID NOT NULL
 created_at TIMESTAMPTZ NOT NULL
 ```
 
-### task_stats
+### tasks_stats
 
 ```sql
 id INT PRIMARY KEY
@@ -57,7 +57,7 @@ completed_tasks INT NOT NULL
 updated_at TIMESTAMPTZ NOT NULL
 ```
 
-Use one row in `task_stats`, for example `id = 1`.
+Use one row in `tasks_stats`, for example `id = 1`.
 
 ## Implementation Steps
 

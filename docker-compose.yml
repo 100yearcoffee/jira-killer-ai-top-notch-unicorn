@@ -40,5 +40,15 @@ services:
       - postgres
       - nats
 
+  rust-worker:
+    build:
+      context: ./rust-worker
+    environment:
+      NATS_URL: nats://nats:4222
+      DATABASE_URL: postgres://tasks_user:tasks_password@postgres:5432/tasks
+    depends_on:
+      - nats
+      - postgres
+
 volumes:
   postgres_data:
